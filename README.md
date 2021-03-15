@@ -14,10 +14,8 @@
 - K - Weight ? 12
 - A - Weight ? 13
 
-Rules
-
-- Card must be the same or higher, unless a wild card is played
-- 4 cards same value removes the pile
+* Card must be the same or higher, unless a wild card is played
+* 4 cards same value removes the pile
 
 Game Board
 
