@@ -6,9 +6,12 @@ let gameData = {
   playerTwoData: {},
   playerOneCards: [],
   playerTwoCards: [],
+  playerOneFaceUp: [],
+  playerOneFaceDown: [],
+  playerTwoFaceUp: [],
+  playerTwoFaceDown: [],
   discardedCards: [],
   activeCards: [],
-  communityCards: 22,
 };
 
 function updateGameData(property, value) {

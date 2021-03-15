@@ -15,6 +15,7 @@ function userJoin({ id, name, room }) {
 
   isDuplicate = duplicates(room);
   console.log(isDuplicate);
+
   let user = {
     id,
     name,
@@ -31,11 +32,6 @@ function userJoin({ id, name, room }) {
     users.splice(removeIndex, 1);
   }
 
-  isDuplicate.length === 2;
-
-  // users.length === 0 && updateGameData('playerOneData', user);
-  // users.length === 1 && updateGameData('playerTwoData', user);
-  console.log(user);
   return user;
 }
 
