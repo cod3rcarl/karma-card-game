@@ -9,39 +9,34 @@ const io = socketIo(server, {
     methods: ['GET', 'POST'],
   },
 });
-const users = [];
-const cors = require('cors');
 
+const cors = require('cors');
+const { userJoin, userLeave, users, isDuplicate, error } = require('./users');
 app.use(cors());
+function checkIfRightRoom(arr, newRoom) {
+  return arr.some(function(e) {
+    return e.room === newRoom;
+  });
+}
 
 io.on('connection', (socket) => {
   console.log(`Socket ${socket.id} connected.`);
 
   socket.on('gameRoom', ({ name, room, id }) => {
-    console.log(users);
-    console.log(id);
-    const user = { id, name, room };
-    const isInRoom = users.includes(id);
-    !isInRoom ? users.push(id) : null;
-    isInRoom ? console.log(`${user.name} is already in room ${user.room}`) : console.log(`${user.name} has joined room ${user.room}`);
+    const user = userJoin({ name, room, id, isDuplicate, error });
+    socket.join(room);
 
+    user.isDuplicate.length >= 2 ? io.to(id).emit('error', { error }) : io.to(room).emit('enterMessage', { message: `${name} has joined`, users, user, error });
     console.log(users);
+    user.isDuplicate.length < 2 && console.log(`${user.name} has joined room ${user.room}`);
+    user.isDuplicate.length < 2 && console.log(`${user.isDuplicate.length + 1} user(s) in room ${user.room}`);
   });
 
   socket.on('leaveGameRoom', ({ name, room, id }) => {
-    console.log('left room');
-    console.log(users);
-    console.log(id);
     socket.leave(room);
-    const index = users.findIndex((user) => user === id);
-    if (index >= 0) {
-      //if not -1 (not found)
-      users.splice(index, 1); //remove user from users array
-    } else {
-      console.log(`User not in room`);
-    }
+    io.to(room).emit('leaveMessage', { message: `${name} has left`, users });
+    userLeave(room, id);
 
-    console.log(users);
     console.log(`${name} has left room ${room}`);
     console.log(`${users.length} user(s) in room ${room}`);
   });
