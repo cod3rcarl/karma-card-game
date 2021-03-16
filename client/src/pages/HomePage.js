@@ -8,66 +8,82 @@ import '../App.css';
 function HomePage() {
   const socket = useContext(SocketContext);
   let id;
-  const [room, setRoom] = useState(null);
-  const [name, setName] = useState('Player');
+
+  const [room, setRoom] = useState('');
+  const [name, setName] = useState('');
   const [connection, setConnection] = useState(false);
   const [details, setDetails] = useState(false);
-  const [game, setGame] = useState(false);
-  const [data, setData] = useState({});
-  const [users, setUsers] = useState([]);
+  const [gameInProgress, setGameInProgress] = useState(false);
+  const [data, setData] = useState(null);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState('');
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [deck, setDeck] = useState(shuffleDeck());
 
   useEffect(() => {
+    socket.on('connect', () => {
+      console.log(socket.id);
+    });
     socket.on('leaveMessage', handleLeaveData);
     socket.on('enterMessage', handleGameData);
     socket.on('error', handleError);
     socket.on('setupBoard', setupBoard);
-  }, []);
+  }, [data]);
+
+  const reset = () => {
+    setRoom('');
+    setData(null);
+    setLoading('');
+    setConnection(false);
+    setDetails(false);
+    setGameInProgress(false);
+    setDeck(shuffleDeck());
+  };
 
   const setupBoard = ({ gameData }) => {
-    console.log(gameData);
+    setGameInProgress(true);
     setData(gameData);
   };
   const handleError = () => {
     setError(true);
     setErrorMessage('Room is full, pick a different name');
-    setConnection(false);
-    setGame(false);
+    reset();
     setTimeout(() => {
       setError(false);
     }, 3000);
   };
 
-  const handleGameData = ({ message, users: players, playerOne, playerTwo }) => {
-    setUsers(players);
+  const handleGameData = ({ message, playerOne, playerTwo }) => {
     setMessage(message);
     setTimeout(() => {
       setMessage('');
+    }, 3000);
+
+    if (playerTwo.room === playerOne.room) {
       socket.emit('deal', {
         deck,
         playerOne,
         playerTwo,
       });
-      setGame(true);
-    }, 3000);
+      setLoading('');
+    } else {
+      setLoading('waiting for 2nd player');
+    }
   };
-  const handleLeaveData = () => {
-    setUsers([]);
-    setMessage('');
+  const handleLeaveData = ({ message, data }) => {
+    setGameInProgress(false);
+    setMessage(message);
+    setData(data);
+    disconnect();
   };
 
   const disconnect = () => {
     console.log('disconnected');
-    name !== 'Player' && leaveRoom();
+    leaveRoom();
+    socket.emit('gameover');
     socket.disconnect();
-    setName('Player');
-    setRoom('');
-    setConnection(false);
-    setGame(false);
-    setDetails(false);
+    reset();
   };
 
   const connect = async () => {
@@ -77,46 +93,67 @@ function HomePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setDetails(true);
     setMessage('');
 
-    id = socket.id;
-    setConnection(true);
-    socket.emit('gameRoom', {
-      id,
-      name,
-      room,
-    });
+    if (!room) {
+      setMessage('Please enter a room name');
+    } else {
+      setMessage('');
+      id = socket.id;
+      setDetails(true);
+      setConnection(true);
+      socket.emit('gameRoom', {
+        id,
+        name,
+        room,
+      });
+    }
   };
+
+  console.log(data);
 
   const leaveRoom = () => {
     id = socket.id;
     socket.emit('leaveGameRoom', {
+      data,
       id,
       name,
       room,
     });
-    setGame(false);
+
+    setGameInProgress(false);
+    setDetails(false);
   };
-  console.log(data);
+
   return (
     <div className='App'>
-      {message && game && !error && message}
-      {error && errorMessage}
+      {message && <h5 data-testid='message'>{message}</h5>}
+      {error && <h5 data-testid='error-message'>{errorMessage}</h5>}
       <header className='App-header'>
         <h1>POWER</h1>
-        <h3>Welcome {name}</h3>
-        {!connection && !error && <button onClick={connect}>connect</button>}
-        {connection && !error && <button onClick={disconnect}>Disconnect</button>}
+        <h3 data-testid='player-name'>Welcome {name}</h3>
+        {!connection && !error && (
+          <button data-testid='connect' onClick={connect}>
+            connect
+          </button>
+        )}
+        {connection && !error && (
+          <button data-testid='disconnect' onClick={disconnect}>
+            Disconnect
+          </button>
+        )}
         {connection && !details && (
           <form onSubmit={handleSubmit}>
-            <input type='text' name='name' id='name' onChange={(e) => setName(e.target.value)} />
-            <input type='text' name='room' id='room' onChange={(e) => setRoom(e.target.value)} />
-            <button type='submit'>Enter {room}</button>
+            <input data-testid='name' value={name} type='text' name='name' id='name' onChange={(e) => setName(e.target.value)} />
+            <input data-testid='room' value={room} type='text' name='room' id='room' onChange={(e) => setRoom(e.target.value)} />
+            <button data-testid='enter-room' type='submit'>
+              Enter {room}
+            </button>
           </form>
         )}
-
-        {game && <Board name={name} gameData={data} />}
+        <br />
+        {loading && <h5 data-testid='loading-message'>{loading}</h5>}
+        {gameInProgress && data && <Board name={name} gameData={data} />}
       </header>
     </div>
   );

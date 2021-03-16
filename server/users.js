@@ -14,7 +14,6 @@ function userJoin({ id, name, room }) {
   const index = users.findIndex((user) => user.id === id);
 
   isDuplicate = duplicates(room);
-  console.log(isDuplicate);
 
   let user = {
     id,
