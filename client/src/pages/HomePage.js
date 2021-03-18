@@ -22,9 +22,6 @@ function HomePage() {
   const [deck, setDeck] = useState(shuffleDeck());
 
   useEffect(() => {
-    socket.on('connect', () => {
-      console.log(socket.id);
-    });
     socket.on('leaveMessage', handleLeaveData);
     socket.on('enterMessage', handleGameData);
     socket.on('error', handleError);
@@ -109,8 +106,6 @@ function HomePage() {
       });
     }
   };
-
-  console.log(data);
 
   const leaveRoom = () => {
     id = socket.id;

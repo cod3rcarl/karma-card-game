@@ -6,7 +6,7 @@ const server = require('http').Server(app);
 const socketIo = require('socket.io');
 const io = socketIo(server, {
   cors: {
-    origin: 'http://localhost:3001',
+    origin: 'http://localhost:3000',
     methods: ['GET', 'POST'],
   },
 });
@@ -20,6 +20,8 @@ let activeCards;
 
 let playerOne = {};
 let playerTwo = {};
+
+// const remove = (arr, value) => arr.filter((ele) => ele.value !== value.value);
 
 io.on('connection', (socket) => {
   console.log(`Socket ${socket.id} connected.`);
@@ -52,6 +54,7 @@ io.on('connection', (socket) => {
       playerOneFaceUp: playingDeck.splice(playingDeck.length - 5, 5),
       playerOneFaceDown: playingDeck.splice(playingDeck.length - 5, 5),
     };
+
     playerTwo = {
       ...playerTwo,
       playerTwoCards: playingDeck.splice(playingDeck.length - 5, 5),
@@ -65,10 +68,10 @@ io.on('connection', (socket) => {
       playerTwo,
       discardedCards: [],
       activeCards,
+      turn: 'playerOne',
     };
     playerTwo.room && io.to(playerOne.room).emit('setupBoard', { gameData });
   });
-
   /* <---------------------------------------- LEAVE GAME ROOM -------------------------------------------> */
 
   socket.on('leaveGameRoom', ({ id, data, name, room }) => {
@@ -81,6 +84,36 @@ io.on('connection', (socket) => {
 
     console.log(`${name} has left room ${room}`);
     console.log(`${users.length} user(s) in room ${room}`);
+  });
+
+  /* <---------------------------------------- PLAYER ONE MOVE -------------------------------------------> */
+
+  socket.on('playerOneMove', ({ card, playerOneCards }) => {
+    let newCards = [];
+
+    for (let i = 0; i < playerOneCards.length; i++) {
+      if (card.length === 4) {
+        if (playerOneCards[i].value !== card[0].value && playerOneCards[i].value !== card[1].value && playerOneCards[i].value !== card[2].value && playerOneCards[i].value !== card[3].value) {
+          newCards.push(playerOneCards[i]);
+        }
+      }
+      if (card.length === 3) {
+        if (playerOneCards[i].value !== card[0].value && playerOneCards[i].value !== card[1].value && playerOneCards[i].value !== card[2].value) {
+          newCards.push(playerOneCards[i]);
+        }
+      }
+      if (card.length === 2) {
+        if (playerOneCards[i].value !== card[0].value && playerOneCards[i].value !== card[1].value) {
+          newCards.push(playerOneCards[i]);
+        }
+      } else if (card.length === 1) {
+        if (playerOneCards[i].value !== card[0].value) {
+          newCards.push(playerOneCards[i]);
+        }
+      }
+    }
+
+    console.log(newCards);
   });
 
   /* <---------------------------------------- GAME OVER -------------------------------------------> */
