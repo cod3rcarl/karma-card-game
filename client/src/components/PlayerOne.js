@@ -155,10 +155,10 @@ const PlayerOne = ({ opponent, gameData }) => {
               )
           )}
 
-        <button style={{ margin: '1rem' }} onClick={(e) => submitCards(playedCard)} disabled={activeCards === 0 || turn === 'playerTwo'}>
+        <button style={{ margin: '1rem' }} onClick={() => submitCards(playedCard)} disabled={activeCards === 0 || turn === 'playerTwo'}>
           Play Card(s)
         </button>
-        <button style={{ margin: '1rem' }} onClick={(e) => pickupCards(activeCards, gameData)} disabled={activeCards === 0 || turn === 'playerTwo'}>
+        <button style={{ margin: '1rem' }} onClick={() => pickupCards(activeCards, gameData)} disabled={activeCards === 0 || turn === 'playerTwo'}>
           Pickup Card(s)
         </button>
       </div>

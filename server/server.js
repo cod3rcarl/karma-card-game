@@ -22,8 +22,6 @@ let pile;
 let playerOne = {};
 let playerTwo = {};
 
-// const remove = (arr, value) => arr.filter((ele) => ele.value !== value.value);
-
 io.on('connection', (socket) => {
   console.log(`Socket ${socket.id} connected.`);
 
@@ -88,6 +86,43 @@ io.on('connection', (socket) => {
     console.log(`${users.length} user(s) in room ${room}`);
   });
 
+  /* <---------------------------------------- FUNCTIONS -------------------------------------------> */
+  const refillPlayerCards = (playerCards, card, newCards) => {
+    for (let i = 0; i < playerCards.length; i++) {
+      if (card.length === 3) {
+        if (playerCards[i].value !== card[0].value && playerCards[i].value !== card[1].value && playerCards[i].value !== card[2].value) {
+          newCards.push(playerCards[i]);
+        }
+      }
+      if (card.length === 2) {
+        if (playerCards[i].value !== card[0].value && playerCards[i].value !== card[1].value) {
+          newCards.push(playerCards[i]);
+        }
+      } else if (card.length === 1) {
+        if (playerCards[i].value !== card[0].value) {
+          newCards.push(playerCards[i]);
+        }
+      }
+    }
+  };
+
+  const lowPileLogic = (data, cards, card, playerCards) => {
+    if (data.pile.length === 3 && card.length >= 3) {
+      playerCards.length <= 5 && cards.push(data.pile.splice(data.pile.length - card.length, 3));
+    } else if (data.pile.length === 2 && card.length >= 2) {
+      playerCards.length <= 5 && cards.push(data.pile.splice(data.pile.length - card.length, 2));
+    } else if (data.pile.length === 1 && card.length >= 1) {
+      playerCards.length <= 5 && cards.push(data.pile.splice(data.pile.length - card.length, 1));
+    } else if (playerCards.length < 5) {
+      cards.push(data.pile.splice(data.pile.length - card.length, card.length));
+    } else if (playerCards.length - card.length === 4) {
+      cards.push(data.pile.splice(data.pile.length - card.length, 1));
+    } else if (playerCards.length - card.length === 3) {
+      cards.push(data.pile.splice(data.pile.length - card.length, 2));
+    } else if (playerCards.length - card.length === 2) {
+      cards.push(data.pile.splice(data.pile.length - card.length, 3));
+    }
+  };
   /* <---------------------------------------- PLAYER ONE MOVE -------------------------------------------> */
 
   socket.on('playerOneMove', ({ card, playerOneCards, playerOne, gameData }) => {
@@ -96,45 +131,16 @@ io.on('connection', (socket) => {
       gameData = { ...gameData, playerOne: { ...playerOne, playerOneCards: playerOneCards.flat() }, turn: 'playerTwo', activeCards: [], pickUp: false };
     } else {
       let newCards = [];
-
       gameData.activeCards.push(card);
-
       let newActiveCards = gameData.activeCards.flat().reverse();
-
-      for (let i = 0; i < playerOneCards.length; i++) {
-        if (card.length === 3) {
-          if (playerOneCards[i].value !== card[0].value && playerOneCards[i].value !== card[1].value && playerOneCards[i].value !== card[2].value) {
-            newCards.push(playerOneCards[i]);
-          }
-        }
-        if (card.length === 2) {
-          if (playerOneCards[i].value !== card[0].value && playerOneCards[i].value !== card[1].value) {
-            newCards.push(playerOneCards[i]);
-          }
-        } else if (card.length === 1) {
-          if (playerOneCards[i].value !== card[0].value) {
-            newCards.push(playerOneCards[i]);
-          }
-        }
-      }
+      // Function located in functions.js
+      refillPlayerCards(playerOneCards, card, newCards);
 
       /* <---------------------------------------- LOGIC WHEN PILE < 5 -------------------------------------------> */
+
       if (gameData.pile.length > 0) {
-        if (gameData.pile.length === 3 && card.length >= 3) {
-          playerOneCards.length <= 5 && newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 3));
-        } else if (gameData.pile.length === 2 && card.length >= 2) {
-          playerOneCards.length <= 5 && newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 2));
-        } else if (gameData.pile.length === 1 && card.length >= 1) {
-          playerOneCards.length <= 5 && newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 1));
-        } else if (playerOneCards.length < 5) {
-          newCards.push(gameData.pile.splice(gameData.pile.length - card.length, card.length));
-        } else if (playerOneCards.length - card.length === 4) {
-          newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 1));
-        } else if (playerOneCards.length - card.length === 3) {
-          newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 2));
-        } else if (playerOneCards.length - card.length === 2) {
-          newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 3));
-        }
+        // Function located in functions.js
+        lowPileLogic(gameData, newCards, card, playerOneCards);
       }
 
       /* <-------------------------------------------------------------------------------------------------------> */
@@ -158,22 +164,7 @@ io.on('connection', (socket) => {
 
       let newActiveCards = gameData.activeCards.flat().reverse();
 
-      for (let i = 0; i < playerOneFaceUp.length; i++) {
-        if (card.length === 3) {
-          if (playerOneFaceUp[i].value !== card[0].value && playerOneFaceUp[i].value !== card[1].value && playerOneFaceUp[i].value !== card[2].value) {
-            newCards.push(playerOneFaceUp[i]);
-          }
-        }
-        if (card.length === 2) {
-          if (playerOneFaceUp[i].value !== card[0].value && playerOneFaceUp[i].value !== card[1].value) {
-            newCards.push(playerOneFaceUp[i]);
-          }
-        } else if (card.length === 1) {
-          if (playerOneFaceUp[i].value !== card[0].value) {
-            newCards.push(playerOneFaceUp[i]);
-          }
-        }
-      }
+      refillPlayerCards(playerOneFaceUp, card, newCards);
 
       gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceUp: newCards.flat() }, turn: 'playerTwo', activeCards: newActiveCards, pickUp: false };
     }
@@ -244,21 +235,7 @@ io.on('connection', (socket) => {
 
     /* <---------------------------------------- LOGIC WHEN PILE < 5 -------------------------------------------> */
     if (gameData.pile.length > 0) {
-      if (gameData.pile.length === 3 && card.length >= 3) {
-        playerOneCards.length <= 5 && newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 3));
-      } else if (gameData.pile.length === 2 && card.length >= 2) {
-        playerOneCards.length <= 5 && newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 2));
-      } else if (gameData.pile.length === 1 && card.length >= 1) {
-        playerOneCards.length <= 5 && newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 1));
-      } else if (playerOneCards.length < 5) {
-        newCards.push(gameData.pile.splice(gameData.pile.length - card.length, card.length));
-      } else if (playerOneCards.length - card.length === 4) {
-        newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 1));
-      } else if (playerOneCards.length - card.length === 3) {
-        newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 2));
-      } else if (playerOneCards.length - card.length === 2) {
-        newCards.push(gameData.pile.splice(gameData.pile.length - card.length, 3));
-      }
+      lowPileLogic(gameData, newCards, card, playerOneCards);
     }
 
     /* <-------------------------------------------------------------------------------------------------------> */
