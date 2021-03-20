@@ -26,6 +26,8 @@ function HomePage() {
     socket.on('enterMessage', handleGameData);
     socket.on('error', handleError);
     socket.on('setupBoard', setupBoard);
+    socket.on('playerTwoTurn', playerTwoTurn);
+    socket.on('playerOneTurn', playerOneTurn);
   }, [data]);
 
   const reset = () => {
@@ -40,6 +42,18 @@ function HomePage() {
 
   const setupBoard = ({ gameData }) => {
     setGameInProgress(true);
+    setData(gameData);
+  };
+  const playerTwoTurn = ({ gameData }) => {
+    setData((data) => {
+      return data;
+    });
+    setData(gameData);
+  };
+  const playerOneTurn = ({ gameData }) => {
+    setData((data) => {
+      return data;
+    });
     setData(gameData);
   };
   const handleError = () => {
@@ -119,6 +133,7 @@ function HomePage() {
     setGameInProgress(false);
     setDetails(false);
   };
+  console.log(data);
 
   return (
     <div className='App'>
