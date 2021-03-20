@@ -13,7 +13,7 @@ const PlayerOne = ({ opponent, gameData }) => {
     turn === 'playerTwo' ? setDisabled(true) : setDisabled(false);
   }, [turn]);
 
-  /* <---------------------------------------- ENTER GAME ROOM -------------------------------------------> */
+  /* <---------------------------------------- PLAY CARD LOGIC-------------------------------------------> */
 
   const playCard = (card) => {
     const checkFilter = playedCard.filter((item) => item.weight !== card.weight);
@@ -24,144 +24,90 @@ const PlayerOne = ({ opponent, gameData }) => {
     }
   };
 
+  const pickupCards = (cards) => {
+    gameData.pickUp = true;
+    socket.emit('playerOneMove', { cards, playerOneCards, playerOne, gameData });
+    setPlayedCard([]);
+  };
+
+  /* <------------------------------------FUNCTIONS FOR SUBMIT-------------------------------------------> */
+  const illegalMove = (warning) => {
+    setMessage(warning);
+    setPlayedCard([]);
+    return;
+  };
+
+  const emitEvent = (card) => {
+    if (playerOneCards.length > 0) {
+      socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData });
+      setPlayedCard([]);
+    }
+    if (playerOneCards.length === 0) {
+      socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData });
+      setPlayedCard([]);
+    }
+    if (playerOne.playerOneFaceUp.length === 0) {
+      socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData });
+      setPlayedCard([]);
+    } else if (playerOne.playerOneFaceDown.length === 0) {
+      socket.emit('gameOver', { gameData });
+    }
+  };
+
+  const emitEventWith10 = (card) => {
+    if (playerOneCards.length > 0) {
+      socket.emit('playerOneMoveWith10', { card, playerOneCards, playerOne, gameData });
+    }
+    if (playerOneCards.length === 0) {
+      socket.emit('playerOneFaceUpMoveWith10', { card, playerOne, playerOneFaceUp, gameData });
+    }
+    if (playerOne.playerOneFaceUp.length === 0) {
+      socket.emit('playerOneFaceDownMoveWith10', { card, playerOne, playerOneFaceDown, gameData });
+    } else if (playerOne.playerOneFaceDown.length === 0) {
+      socket.emit('gameOver', { gameData });
+    }
+    setPlayedCard([]);
+  };
+
+  /* <------------------------------------SUBMIT CARDS-------------------------------------------> */
+
   const submitCards = (card) => {
     if (activeCards.length > 0) {
       if (card[0].type === 'normal') {
         if (activeCards[0].weight === 3) {
-          setMessage('Play a 3 or pickup cards');
-          setPlayedCard([]);
-          return;
+          illegalMove('Illegal move! Play a 3 or pickup cards');
         }
         if (activeCards[0].weight === 7 && card[0].weight > 7) {
-          setMessage('Card must be wild or lower or pickup cards');
-          setPlayedCard([]);
-          return;
+          illegalMove('Illegal move! Card must be lower than a 7');
         }
         if (activeCards[0].weight > card[0].weight && activeCards[0].weight !== 7) {
-          setMessage('illegal move, Card must be wild or higher or pickup cards');
-          setPlayedCard([]);
-          return;
+          illegalMove('Illegal move! Card must be higher than played card');
         }
-        if (playerOneCards.length > 0) {
-          socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOneCards.length === 0) {
-          socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOne.playerOneFaceUp.length === 0) {
-          socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData });
-          setPlayedCard([]);
-        } else if (playerOne.playerOneFaceDown.length === 0) {
-          socket.emit('gameOver', { gameData });
-        }
+        emitEvent(card);
       }
       if (card[0].type === 'lower') {
         if (activeCards[0].weight === 3) {
-          setMessage('Play a 3 or pickup cards');
-          setPlayedCard([]);
-          return;
+          illegalMove('Illegal move! Play a 3 or pickup cards');
         }
         if (activeCards[0].weight > card[0].weight) {
-          setMessage('illegal move, Card must be wild or higher or pickup cards');
-          setPlayedCard([]);
-          return;
+          illegalMove('Illegal move! Card must be higher than played card');
         }
-        if (playerOneCards.length > 0) {
-          socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOneCards.length === 0) {
-          socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOne.playerOneFaceUp.length === 0) {
-          socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData });
-          setPlayedCard([]);
-        } else if (playerOne.playerOneFaceDown.length === 0) {
-          socket.emit('gameOver', { gameData });
-        }
+        emitEvent(card);
       }
       if (card[0].weight === 2) {
         if (activeCards[0].weight === 3) {
-          setMessage('Play a 3 or pickup cards');
-          setPlayedCard([]);
-          return;
+          illegalMove('Illegal move! Play a 3 or pickup cards');
         }
-        if (playerOneCards.length > 0) {
-          socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOneCards.length === 0) {
-          socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOne.playerOneFaceUp.length === 0) {
-          socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData });
-          setPlayedCard([]);
-        } else if (playerOne.playerOneFaceDown.length === 0) {
-          socket.emit('gameOver', { gameData });
-        }
+        emitEvent(card);
       }
       if (card[0].weight === 10) {
-        if (playerOneCards.length > 0) {
-          socket.emit('playerOneMoveWith10', { card, playerOneCards, playerOne, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOneCards.length === 0) {
-          socket.emit('playerOneFaceUpMoveWith10', { card, playerOne, playerOneFaceUp, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOne.playerOneFaceUp.length === 0) {
-          socket.emit('playerOneFaceDownMoveWith10', { card, playerOne, playerOneFaceDown, gameData });
-          setPlayedCard([]);
-        } else if (playerOne.playerOneFaceDown.length === 0) {
-          socket.emit('gameOver', { gameData });
-        }
-      }
-      if (card[0].weight === 3) {
-        if (playerOneCards.length > 0) {
-          socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOneCards.length === 0) {
-          socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData });
-          setPlayedCard([]);
-        }
-        if (playerOne.playerOneFaceUp.length === 0) {
-          socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData });
-          setPlayedCard([]);
-        } else if (playerOne.playerOneFaceDown.length === 0) {
-          socket.emit('gameOver', { gameData });
-        }
+        emitEventWith10(card);
       }
     } else {
-      if (playerOneCards.length > 0) {
-        socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData });
-        setPlayedCard([]);
-      }
-      if (playerOneCards.length === 0) {
-        socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData });
-        setPlayedCard([]);
-      }
-      if (playerOne.playerOneFaceUp.length === 0) {
-        socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData });
-        setPlayedCard([]);
-      } else if (playerOne.playerOneFaceDown.length === 0) {
-        socket.emit('gameOver', { gameData });
-      }
+      emitEvent(card);
     }
   };
 
-  const pickupCards = (cards) => {
-    gameData.pickUp = true;
-    console.log(gameData);
-    socket.emit('playerOneMove', { cards, playerOneCards, playerOne, gameData });
-    setPlayedCard([]);
-  };
-  console.log(playedCard);
-  // console.log(playedCard[0].target.defaultValue);
   return (
     <div>
       FaceDown:
