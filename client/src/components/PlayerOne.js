@@ -6,6 +6,7 @@ const PlayerOne = ({ opponent, gameData }) => {
   const { name, playerOneCards, playerOneFaceUp, playerOneFaceDown } = playerOne;
   const [disabled, setDisabled] = useState(false);
   const [playedCard, setPlayedCard] = useState([]);
+  const [currentActiveCard, setCurrentActiveCard] = useState([]);
   const [message, setMessage] = useState('');
   const socket = useContext(SocketContext);
 
@@ -21,89 +22,108 @@ const PlayerOne = ({ opponent, gameData }) => {
       setMessage('illegal move');
     } else {
       setPlayedCard([...playedCard, card]);
+      setCurrentActiveCard([...currentActiveCard, card]);
     }
-  };
-
-  const pickupCards = (cards) => {
-    gameData.pickUp = true;
-    socket.emit('playerOneMove', { cards, playerOneCards, playerOne, gameData });
-    setPlayedCard([]);
   };
 
   /* <------------------------------------FUNCTIONS FOR SUBMIT-------------------------------------------> */
   const illegalMove = (warning) => {
     setMessage(warning);
     setPlayedCard([]);
-    return;
   };
 
   const emitEvent = (card) => {
     if (playerOneCards.length > 0) {
-      socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData });
+      socket.emit('playerOneMove', { card, playerOneCards, playerOne, gameData, currentActiveCard });
+
       setPlayedCard([]);
     }
-    if (playerOneCards.length === 0) {
-      socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData });
+    if (playerOneCards.length === 0 && playerOne.playerOneFaceUp.length > 0) {
+      socket.emit('playerOneFaceUpMove', { card, playerOne, playerOneFaceUp, gameData, currentActiveCard });
+
       setPlayedCard([]);
     }
-    if (playerOne.playerOneFaceUp.length === 0) {
-      socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData });
+    if (playerOne.playerOneFaceUp.length === 0 && playerOne.playerOneFaceDown.length > 1) {
+      socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData, currentActiveCard });
+
       setPlayedCard([]);
-    } else if (playerOne.playerOneFaceDown.length === 0) {
-      socket.emit('gameOver', { gameData });
     }
+    if (playerOne.playerOneFaceDown.length === 1 && gameData.pickup === true) {
+      socket.emit('playerOneFaceDownMove', { card, playerOne, playerOneFaceDown, gameData, currentActiveCard });
+
+      setPlayedCard([]);
+    } else if (playerOne.playerOneFaceDown.length === 1 && gameData.pickup !== true) {
+      socket.emit('playerOneWins', { gameData });
+    }
+    setCurrentActiveCard([]);
   };
 
   const emitEventWith10 = (card) => {
     if (playerOneCards.length > 0) {
-      socket.emit('playerOneMoveWith10', { card, playerOneCards, playerOne, gameData });
+      socket.emit('playerOneMoveWith10', { card, playerOneCards, playerOne, gameData, currentActiveCard });
     }
-    if (playerOneCards.length === 0) {
-      socket.emit('playerOneFaceUpMoveWith10', { card, playerOne, playerOneFaceUp, gameData });
+    if (playerOneCards.length === 0 && playerOne.playerOneFaceUp.length > 0) {
+      socket.emit('playerOneFaceUpMoveWith10', { card, playerOne, playerOneFaceUp, gameData, currentActiveCard });
     }
-    if (playerOne.playerOneFaceUp.length === 0) {
-      socket.emit('playerOneFaceDownMoveWith10', { card, playerOne, playerOneFaceDown, gameData });
-    } else if (playerOne.playerOneFaceDown.length === 0) {
-      socket.emit('gameOver', { gameData });
+    if (playerOne.playerOneFaceUp.length === 0 && playerOne.playerOneFaceDown.length > 1) {
+      socket.emit('playerOneFaceDownMoveWith10', { card, playerOne, playerOneFaceDown, gameData, currentActiveCard });
+    } else if (playerOne.playerOneFaceDown.length === 1) {
+      socket.emit('playerOneWins', { gameData });
+      //JUST SET THE WINNER HERE
     }
+
     setPlayedCard([]);
+  };
+
+  const pickupCards = (cards) => {
+    gameData.pickUp = true;
+    emitEvent(cards);
   };
 
   /* <------------------------------------SUBMIT CARDS-------------------------------------------> */
 
   const submitCards = (card) => {
     if (activeCards.length > 0) {
-      if (card[0].type === 'normal') {
-        if (activeCards[0].weight === 3) {
+      if (card && card[0].type === 'normal') {
+        if (activeCards[activeCards.length - 1].weight === 3) {
           illegalMove('Illegal move! Play a 3 or pickup cards');
+          return;
         }
-        if (activeCards[0].weight === 7 && card[0].weight > 7) {
+        if (activeCards[activeCards.length - 1].weight === 7 && card[0].weight > 7) {
           illegalMove('Illegal move! Card must be lower than a 7');
+          return;
         }
-        if (activeCards[0].weight > card[0].weight && activeCards[0].weight !== 7) {
+        if (activeCards[activeCards.length - 1].weight > card[0].weight && activeCards[activeCards.length - 1].weight !== 7) {
           illegalMove('Illegal move! Card must be higher than played card');
+          return;
         }
         emitEvent(card);
       }
-      if (card[0].type === 'lower') {
-        if (activeCards[0].weight === 3) {
+      if (card && card[0].type === 'lower') {
+        if (activeCards[activeCards.length - 1].weight === 3) {
           illegalMove('Illegal move! Play a 3 or pickup cards');
+          return;
         }
-        if (activeCards[0].weight > card[0].weight) {
+        if (activeCards[activeCards.length - 1].weight > card[0].weight) {
           illegalMove('Illegal move! Card must be higher than played card');
+          return;
         }
         emitEvent(card);
       }
-      if (card[0].weight === 2) {
-        if (activeCards[0].weight === 3) {
+      if (card && card[0].weight === 2) {
+        if (activeCards[activeCards.length - 1].weight === 3) {
           illegalMove('Illegal move! Play a 3 or pickup cards');
+          return;
         }
         emitEvent(card);
       }
-      if (card[0].weight === 10) {
+      if (card && card[0].weight === 10) {
         emitEventWith10(card);
       }
-    } else {
+      if (card && card[0].weight === 3) {
+        emitEvent(card);
+      }
+    } else if (activeCards.length === 0) {
       emitEvent(card);
     }
   };
@@ -154,13 +174,22 @@ const PlayerOne = ({ opponent, gameData }) => {
                 </span>
               )
           )}
-
-        <button style={{ margin: '1rem' }} onClick={() => submitCards(playedCard)} disabled={activeCards === 0 || turn === 'playerTwo'}>
-          Play Card(s)
-        </button>
-        <button style={{ margin: '1rem' }} onClick={() => pickupCards(activeCards, gameData)} disabled={activeCards === 0 || turn === 'playerTwo'}>
-          Pickup Card(s)
-        </button>
+        <div>
+          {' '}
+          <button style={{ margin: '1rem' }} onClick={() => submitCards(playedCard)} disabled={activeCards === 0 || turn === 'playerTwo'}>
+            Play Card(s)
+          </button>
+          <button style={{ margin: '1rem' }} onClick={() => pickupCards(activeCards)} disabled={activeCards === 0 || turn === 'playerTwo'}>
+            Pickup Card(s)
+          </button>
+        </div>
+        <div>
+          {currentActiveCard.map((card, i) => {
+            <span style={{ display: 'inlineBlock', margin: '1rem' }} key={i}>
+              <span>{card.value}</span>
+            </span>;
+          })}
+        </div>
       </div>
     </div>
   );

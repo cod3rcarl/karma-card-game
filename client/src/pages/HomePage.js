@@ -15,19 +15,21 @@ function HomePage() {
   const [details, setDetails] = useState(false);
   const [gameInProgress, setGameInProgress] = useState(false);
   const [data, setData] = useState(null);
+  const [currentActiveCard, setCurrentActiveCard] = useState([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState('');
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [deck, setDeck] = useState(shuffleDeck());
+  const [winner, setWinner] = useState('');
 
   useEffect(() => {
     socket.on('leaveMessage', handleLeaveData);
     socket.on('enterMessage', handleGameData);
     socket.on('error', handleError);
     socket.on('setupBoard', setupBoard);
-    socket.on('playerTwoTurn', playerTwoTurn);
-    socket.on('playerOneTurn', playerOneTurn);
+    socket.on('nextTurn', nextTurn);
+    socket.on('winningMessage', win);
   }, [data]);
 
   const reset = () => {
@@ -39,22 +41,35 @@ function HomePage() {
     setGameInProgress(false);
     setDeck(shuffleDeck());
   };
+  const win = ({ message, gameData }) => {
+    console.log(message);
+    console.log(gameData);
+    setData((data) => {
+      return data;
+    });
+    setData(gameData);
+    setMessage(message);
+    setLoading(message);
+  };
 
   const setupBoard = ({ gameData }) => {
     setGameInProgress(true);
     setData(gameData);
   };
-  const playerTwoTurn = ({ gameData }) => {
+
+  const nextTurn = ({ gameData, message, currentActiveCard }) => {
+    console.log(gameData);
+
     setData((data) => {
       return data;
     });
     setData(gameData);
-  };
-  const playerOneTurn = ({ gameData }) => {
-    setData((data) => {
-      return data;
-    });
-    setData(gameData);
+    setCurrentActiveCard(currentActiveCard);
+    setMessage(message);
+
+    if (currentActiveCard.length === 0) {
+      setWinner(message);
+    }
   };
   const handleError = () => {
     setError(true);
@@ -90,7 +105,6 @@ function HomePage() {
   };
 
   const disconnect = () => {
-    console.log('disconnected');
     leaveRoom();
     socket.emit('gameover');
     socket.disconnect();
@@ -163,7 +177,8 @@ function HomePage() {
         )}
         <br />
         {loading && <h5 data-testid='loading-message'>{loading}</h5>}
-        {gameInProgress && data && <Board name={name} gameData={data} />}
+        {winner && <h5 data-testid='loading-message'>{winner}</h5>}
+        {gameInProgress && data && <Board name={name} gameData={data} currentActiveCard={currentActiveCard} />}
       </header>
     </div>
   );
