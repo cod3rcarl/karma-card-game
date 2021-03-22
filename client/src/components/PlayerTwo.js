@@ -1,12 +1,11 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { SocketContext } from '../socketContext';
 
-const PlayerTwo = ({ opponent, gameData }) => {
+const PlayerTwo = ({ gameData }) => {
   const { playerTwo, turn, activeCards } = gameData;
   const { name, playerTwoCards, playerTwoFaceUp, playerTwoFaceDown } = playerTwo;
   const [disabled, setDisabled] = useState(false);
   const [playedCard, setPlayedCard] = useState([]);
-  const [currentActiveCard, setCurrentActiveCard] = useState([]);
   const [message, setMessage] = useState('');
   const socket = useContext(SocketContext);
 
@@ -22,7 +21,6 @@ const PlayerTwo = ({ opponent, gameData }) => {
       setMessage('illegal move');
     } else {
       setPlayedCard([...playedCard, card]);
-      setCurrentActiveCard([...currentActiveCard, card]);
     }
   };
 
@@ -34,41 +32,38 @@ const PlayerTwo = ({ opponent, gameData }) => {
 
   const emitEvent = (card) => {
     if (playerTwoCards.length > 0) {
-      socket.emit('playerTwoMove', { card, playerTwoCards, playerTwo, gameData, currentActiveCard });
-
+      setMessage('');
       setPlayedCard([]);
+      socket.emit('playerTwoMove', { card, playerTwoCards, playerTwo, gameData });
     }
-    if (playerTwoCards.length === 0 && playerTwo.playerTwoFaceUp.length > 0) {
-      socket.emit('playerTwoFaceUpMove', { card, playerTwo, playerTwoFaceUp, gameData, currentActiveCard });
-
+    if (playerTwoCards.length === 0 && playerTwoFaceUp.length > 0) {
+      setMessage('');
       setPlayedCard([]);
+      socket.emit('playerTwoFaceUpMove', { card, playerTwo, playerTwoFaceUp, gameData });
     }
-    if (playerTwo.playerTwoFaceUp.length === 0 && playerTwo.playerTwoFaceDown.length > 1) {
-      socket.emit('playerTwoFaceDownMove', { card, playerTwo, playerTwoFaceDown, gameData, currentActiveCard });
-
+    if (playerTwoFaceUp.length === 0 && playerTwoFaceDown.length !== card.length) {
+      setMessage('');
       setPlayedCard([]);
+      socket.emit('playerTwoFaceDownMove', { card, playerTwo, playerTwoFaceDown, gameData });
+    } else if (playerTwoFaceDown.length === card.length) {
+      socket.emit('playerTwoWins', { message: `${name} WINS`, gameData });
     }
-    if (playerTwo.playerTwoFaceDown.length === 1 && gameData.pickup === true) {
-      socket.emit('playerTwoFaceDownMove', { card, playerTwo, playerTwoFaceDown, gameData, currentActiveCard });
-
-      setPlayedCard([]);
-    } else if (playerTwo.playerTwoFaceDown.length === 1 && gameData.pickup !== true) {
-      socket.emit('playerTwoWins', { gameData });
-    }
-    setCurrentActiveCard([]);
   };
 
   const emitEventWith10 = (card) => {
     if (playerTwoCards.length > 0) {
-      socket.emit('playerTwoMoveWith10', { card, playerTwoCards, playerTwo, gameData, currentActiveCard });
+      setMessage('');
+      socket.emit('playerTwoMoveWith10', { card, playerTwoCards, playerTwo, gameData });
     }
-    if (playerTwoCards.length === 0 && playerTwo.playerTwoFaceUp.length > 0) {
-      socket.emit('playerTwoFaceUpMoveWith10', { card, playerTwo, playerTwoFaceUp, gameData, currentActiveCard });
+    if (playerTwoCards.length === 0 && playerTwoFaceUp.length > 0) {
+      setMessage('');
+      socket.emit('playerTwoFaceUpMoveWith10', { card, playerTwo, playerTwoFaceUp, gameData });
     }
-    if (playerTwo.playerTwoFaceUp.length === 0 && playerTwo.playerTwoFaceDown.length > 1) {
-      socket.emit('playerTwoFaceDownMoveWith10', { card, playerTwo, playerTwoFaceDown, gameData, currentActiveCard });
-    } else if (playerTwo.playerTwoFaceDown.length === 1) {
-      socket.emit('playerTwoWins', { gameData });
+    if (playerTwoFaceUp.length === 0 && playerTwoFaceDown.length !== card.length) {
+      setMessage('');
+      socket.emit('playerTwoFaceDownMoveWith10', { card, playerTwo, playerTwoFaceDown, gameData });
+    } else if (playerTwoFaceDown.length === card.length) {
+      socket.emit('playerTwoWins', { message: `${name} WINS`, gameData });
     }
 
     setPlayedCard([]);
@@ -82,8 +77,12 @@ const PlayerTwo = ({ opponent, gameData }) => {
   /* <------------------------------------SUBMIT CARDS-------------------------------------------> */
 
   const submitCards = (card) => {
+    if (card.length === 0) {
+      illegalMove('Illegal move! You must play a card or pickup the pile');
+      return;
+    }
     if (activeCards.length > 0) {
-      if (card[0].type === 'normal') {
+      if (card && card[0].type === 'normal') {
         if (activeCards[activeCards.length - 1].weight === 3) {
           illegalMove('Illegal move! Play a 3 or pickup cards');
           return;
@@ -98,7 +97,7 @@ const PlayerTwo = ({ opponent, gameData }) => {
         }
         emitEvent(card);
       }
-      if (card[0].type === 'lower') {
+      if (card && card[0].type === 'lower') {
         if (activeCards[activeCards.length - 1].weight === 3) {
           illegalMove('Illegal move! Play a 3 or pickup cards');
           return;
@@ -109,19 +108,21 @@ const PlayerTwo = ({ opponent, gameData }) => {
         }
         emitEvent(card);
       }
-      if (card[0].weight === 2) {
+      if (card && card[0].weight === 2) {
         if (activeCards[activeCards.length - 1].weight === 3) {
           illegalMove('Illegal move! Play a 3 or pickup cards');
           return;
         }
         emitEvent(card);
       }
-      if (card[0].weight === 10) {
+      if (card && card[0].weight === 10) {
         emitEventWith10(card);
       }
-      if (card[0].weight === 3) {
+      if (card && card[0].weight === 3) {
         emitEvent(card);
       }
+    } else if (card.length > 0 && activeCards.length === 0 && card[0].weight === 10) {
+      emitEventWith10(card);
     } else if (activeCards.length === 0) {
       emitEvent(card);
     }
@@ -129,57 +130,191 @@ const PlayerTwo = ({ opponent, gameData }) => {
 
   return (
     <div>
-      FaceDown:
-      {playerTwo.playerTwoFaceDown.map((card, i) => (
-        <span key={i}>{card.value}</span>
-      ))}
-      <br />
-      FaceUp:
-      {playerTwo.playerTwoFaceUp.map((card, i) => (
-        <span key={i}>{card.value}</span>
-      ))}
+      <p> Face Up Cards</p>
+      <div style={{ border: '1px solid white', padding: '0.7rem' }}>
+        {playerTwo.playerTwoFaceUp.map((card, i) => (
+          <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
+            <input
+              style={{
+                padding: '1.8rem 1.2rem',
+                fontSize: '1rem',
+                color: 'white',
+                backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+              }}
+              type='button'
+              value={`${card.value}`}
+              id='player-two-two'
+              disabled
+            />
+          </span>
+        ))}
+      </div>
       {message && <h5 data-testid='message'>{message}</h5>}
-      <h3>
-        {name} vs {opponent}
-      </h3>
+
+      <p>{`${name}'s Cards`}</p>
       <div>
         {playedCard.map((card, i) => (
-          <span onClick={() => setPlayedCard([])} key={i}>{`${card.value}`}</span>
+          <span key={i} onClick={() => setPlayedCard([])} style={{ display: 'inlineBlock' }}>
+            <input
+              style={{
+                margin: '1rem 0.1rem',
+                padding: '1rem 0.5rem',
+                fontSize: '0.5rem',
+                color: 'white',
+                backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+              }}
+              type='button'
+              value={`${card.value}`}
+              disabled={disabled}
+            />
+          </span>
         ))}
-        <br />
-        {playerTwoCards.length > 0
-          ? playerTwoCards.map(
+        <div>
+          {playerTwoCards.length > 0
+            ? playerTwoCards.map(
+                (card, i) =>
+                  playedCard.filter((item) => item.value === card.value).length === 0 && (
+                    <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
+                      <input
+                        style={{
+                          padding: '1.8rem 1.2rem',
+                          fontSize: '1rem',
+                          color: 'white',
+                          backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+                        }}
+                        type='button'
+                        value={`${card.value}`}
+                        id='player-two-two'
+                        onClick={() => playCard(card)}
+                        disabled={disabled}
+                      />
+                    </span>
+                  )
+              )
+            : playerTwoFaceUp.map(
+                (card, i) =>
+                  playedCard.filter((item) => item.value === card.value).length === 0 && (
+                    <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
+                      <input
+                        style={{
+                          padding: '1.8rem 1.2rem',
+                          fontSize: '1rem',
+                          color: 'white',
+                          backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+                        }}
+                        type='button'
+                        value={`${card.value}`}
+                        id='player-two-two'
+                        onClick={() => playCard(card)}
+                        disabled={disabled}
+                      />
+                    </span>
+                  )
+              )}
+          {playerTwo.playerTwoFaceUp.length === 0 &&
+            playerTwoFaceDown.map(
               (card, i) =>
                 playedCard.filter((item) => item.value === card.value).length === 0 && (
-                  <span key={i} style={{ display: 'inlineBlock', margin: '1rem' }}>
-                    <input type='button' value={`${card.value}`} id='player-Two-Two' onClick={() => playCard(card)} disabled={disabled} />
-                  </span>
-                )
-            )
-          : playerTwoFaceUp.map(
-              (card, i) =>
-                playedCard.filter((item) => item.value === card.value).length === 0 && (
-                  <span key={i} style={{ display: 'inlineBlock', margin: '1rem' }}>
-                    <input type='button' value={`${card.value}`} id='player-Two-Two' onClick={() => playCard(card)} disabled={disabled} />
+                  <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
+                    <input
+                      style={{
+                        padding: '1.8rem 1.2rem',
+                        fontSize: '1rem',
+                        color: 'white',
+                        backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+                      }}
+                      type='button'
+                      value={`${card.value}`}
+                      id='player-two-two'
+                      onClick={() => playCard(card)}
+                      disabled={disabled}
+                    />
                   </span>
                 )
             )}
-        {playerTwo.playerTwoFaceUp.length === 0 &&
-          playerTwoFaceDown.map(
-            (card, i) =>
-              playedCard.filter((item) => item.value === card.value).length === 0 && (
-                <span key={i} style={{ display: 'inlineBlock', margin: '1rem' }}>
-                  <input type='button' value={`${card.value}`} id='player-Two-Two' onClick={() => playCard(card)} disabled={disabled} />
-                </span>
-              )
-          )}
+        </div>
 
-        <button style={{ margin: '1rem' }} onClick={() => submitCards(playedCard)} disabled={activeCards === 0 || turn === 'playerOne'}>
-          Play Card(s)
-        </button>
-        <button style={{ margin: '1rem' }} onClick={() => pickupCards(activeCards)} disabled={activeCards === 0 || turn === 'playerOne'}>
-          Pickup Card(s)
-        </button>
+        <div>
+          {' '}
+          <button style={{ margin: '1rem 0.3rem', width: '8rem', padding: '1rem' }} onClick={() => submitCards(playedCard)} disabled={activeCards === 0 || turn === 'playerOne'}>
+            Play Card(s)
+          </button>
+          <button style={{ margin: '1rem 0.3rem', width: '8rem', padding: '1rem' }} onClick={() => pickupCards(activeCards)} disabled={activeCards === 0 || turn === 'playerOne'}>
+            Pickup Card(s)
+          </button>
+        </div>
+        <div>
+          <p>Last 5 Cards</p>
+          {activeCards.length <= 5
+            ? activeCards.map((card, i) => {
+                return (
+                  <span style={{ display: 'inlineBlock', margin: '0.1rem' }} key={i}>
+                    <input
+                      style={{
+                        padding: '1rem 0.5rem',
+                        fontSize: '0.5rem',
+                        color: 'white',
+                        backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+                      }}
+                      type='button'
+                      value={`${card.value}`}
+                      disabled
+                    />
+                  </span>
+                );
+              })
+            : activeCards.slice(activeCards.length - 5, activeCards.length).map((card, i) => {
+                return (
+                  <span style={{ display: 'inlineBlock', margin: '0.1rem' }} key={i}>
+                    <input
+                      style={{
+                        padding: '1rem 0.5rem',
+                        fontSize: '0.5rem',
+                        color: 'white',
+                        backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+                      }}
+                      type='button'
+                      value={`${card.value}`}
+                      disabled
+                    />
+                  </span>
+                );
+              })}
+        </div>
+        <p> Face Down</p>
+        {playerTwo.playerTwoFaceUp.length === 0
+          ? playerTwo.playerTwoFaceDown.map((card, i) => (
+              <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem', visibility: 'hidden' }}>
+                <input
+                  style={{
+                    padding: '1.8rem 1.2rem',
+                    fontSize: '1rem',
+                    color: 'white',
+                    backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+                  }}
+                  type='button'
+                  value={`${card.value}`}
+                  id='player-two-two'
+                  disabled
+                />
+              </span>
+            ))
+          : playerTwo.playerTwoFaceDown.map((card, i) => (
+              <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem', visibility: 'visible' }}>
+                <input
+                  style={{
+                    padding: '1.8rem 1.2rem',
+                    fontSize: '1rem',
+                    color: 'grey',
+                    backgroundColor: 'grey',
+                  }}
+                  type='button'
+                  value={`${card.value}`}
+                  id='player-two-two'
+                  disabled
+                />
+              </span>
+            ))}
       </div>
     </div>
   );

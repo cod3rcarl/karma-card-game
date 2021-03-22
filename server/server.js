@@ -5,6 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const server = require('http').Server(app);
 const socketIo = require('socket.io');
 const io = socketIo(server, {
+  reconnection: false,
+  autoConnect: false,
   cors: {
     origin: 'http://localhost:3000',
     methods: ['GET', 'POST'],
@@ -27,7 +29,7 @@ io.on('connection', (socket) => {
 
   /* <---------------------------------------- ENTER GAME ROOM -------------------------------------------> */
 
-  socket.on('gameRoom', ({ name, room, id }) => {
+  socket.on('gameRoom', ({ name, room, id, connection }) => {
     const user = userJoin({ name, room, id, isDuplicate, error });
 
     socket.join(room);
@@ -35,7 +37,7 @@ io.on('connection', (socket) => {
       ? (playerOne = { ...playerOne, game_id: uuidv4(), name, room, id, isDuplicate: user.isDuplicate, error })
       : (playerTwo = { ...playerTwo, game_id: playerOne.game_id, name, room, id, isDuplicate: user.isDuplicate, error });
 
-    user.isDuplicate.length >= 2 ? io.to(id).emit('error', { error }) : io.to(room).emit('enterMessage', { message: `${name} has joined`, users, playerOne, playerTwo });
+    user.isDuplicate.length >= 2 || !connection ? io.to(id).emit('error', { error }) : io.to(room).emit('enterMessage', { message: `${name} has joined`, users, playerOne, playerTwo });
 
     user.isDuplicate.length < 2 && console.log(`${user.name} has joined room ${user.room}`);
     user.isDuplicate.length < 2 && console.log(`${user.isDuplicate.length + 1} user(s) in room ${user.room}`);
@@ -74,16 +76,36 @@ io.on('connection', (socket) => {
   });
   /* <---------------------------------------- LEAVE GAME ROOM -------------------------------------------> */
 
-  socket.on('leaveGameRoom', ({ id, data, name, room }) => {
-    if (data) {
-      data = {};
+  socket.on('leaveGameRoom', ({ id, name, room, data }) => {
+    if (data && data.playerOne.id === id) {
+      console.log('playerOne left');
+      userLeave(room, id);
+      userLeave(room, data.playerTwo.id);
+
+      //io.of('/').connected[data.playerTwo.id].leave(room);
+      socket.disconnect(id);
+      socket.disconnect(data.playerTwo.id);
+      socket.leave(room);
     }
-    userLeave(room, id);
-    socket.leave(room);
-    io.to(room).emit('leaveMessage', { message: `${name} has left`, data });
+    if (data && data.playerTwo.id === id) {
+      console.log('playerTwo left');
+      userLeave(room, id);
+      userLeave(room, data.playerOne.id);
+      //io.of('/').connected[data.playerOne.id].leave(room);
+      socket.disconnect(id);
+      socket.disconnect(data.playerOne.id);
+      socket.leave(room);
+    }
+
+    io.to(room).emit('leaveMessage', { message: `${name} has left, please refresh game` });
 
     console.log(`${name} has left room ${room}`);
     console.log(`${users.length} user(s) in room ${room}`);
+  });
+  /* <---------------------------------------- NEW GAME-------------------------------------------> */
+
+  socket.on('newGame', ({ room }) => {
+    io.to(room).emit('suggestNewGame');
   });
 
   /* <---------------------------------------- FUNCTIONS -------------------------------------------> */
@@ -127,10 +149,9 @@ io.on('connection', (socket) => {
 
   const fourOfAKind = (card, myCards) => {
     const four = [myCards[myCards.length - 1].weight, myCards[myCards.length - 2].weight, myCards[myCards.length - 3].weight, myCards[myCards.length - 4].weight];
-    console.log(four);
 
     const clearPile = four.filter((myCard) => myCard === card[0].weight);
-    console.log(clearPile);
+
     return clearPile;
   };
 
@@ -165,28 +186,40 @@ io.on('connection', (socket) => {
     return newDiscardedCards;
   };
 
+  function compare(a, b) {
+    const weightA = a.weight;
+    const weightB = b.weight;
+
+    let comparison = 0;
+    if (weightA > weightB) {
+      comparison = 1;
+    } else if (weightA < weightB) {
+      comparison = -1;
+    }
+    return comparison;
+  }
+
   /* <---------------------------------------- PLAYER ONE MOVE ----------------------------------------------------> */
 
-  socket.on('playerOneMove', ({ card, playerOneCards, playerOne, gameData, currentActiveCard }) => {
+  socket.on('playerOneMove', ({ card, playerOneCards, playerOne, gameData }) => {
     let newCards = [];
-    console.log(gameData.pickUp);
 
     if (gameData.pickUp) {
       playerOneCards.push(gameData.activeCards);
-      console.log(playerOneCards);
-      gameData = { ...gameData, playerOne: { ...playerOne, playerOneCards: playerOneCards.flat() }, turn: 'playerTwo', activeCards: [], pickUp: false };
+
+      gameData = { ...gameData, playerOne: { ...playerOne, playerOneCards: playerOneCards.flat().sort(compare) }, turn: 'playerTwo', activeCards: [], pickUp: false };
     } else {
       gameData.activeCards.push(card);
 
       let myCards = gameData.activeCards.flat();
-      console.log(myCards);
+
       if (myCards.length > 3) {
         const clearPile = fourOfAKind(card, myCards);
         if (clearPile.length === 4) {
           const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerOneCards);
           gameData = {
             ...gameData,
-            playerOne: { ...playerOne, playerOneCards: newCards.flat() },
+            playerOne: { ...playerOne, playerOneCards: newCards.flat().sort(compare) },
             turn: 'playerOne',
             activeCards: [],
             discardedCards: newDiscardedCards,
@@ -197,7 +230,7 @@ io.on('connection', (socket) => {
 
           gameData = {
             ...gameData,
-            playerOne: { ...playerOne, playerOneCards: newCards.flat() },
+            playerOne: { ...playerOne, playerOneCards: newCards.flat().sort(compare) },
             turn: 'playerTwo',
             activeCards: newActiveCards.flat(),
             pickUp: false,
@@ -208,25 +241,25 @@ io.on('connection', (socket) => {
 
         gameData = {
           ...gameData,
-          playerOne: { ...playerOne, playerOneCards: newCards.flat() },
+          playerOne: { ...playerOne, playerOneCards: newCards.flat().sort(compare) },
           turn: 'playerTwo',
           activeCards: newActiveCards.flat(),
           pickUp: false,
         };
       }
     }
-    console.log(gameData.playerOne.playerOneCards);
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData, currentActiveCard });
+
+    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER ONE FACEUP MOVE -------------------------------------------> */
 
-  socket.on('playerOneFaceUpMove', ({ card, playerOneFaceUp, playerOne, gameData, currentActiveCard }) => {
+  socket.on('playerOneFaceUpMove', ({ card, playerOneFaceUp, playerOne, gameData }) => {
     let newCards = [];
 
     if (gameData.pickUp) {
       playerOneFaceUp.push(gameData.activeCards);
-      gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceUp: playerOneFaceUp.flat() }, turn: 'playerTwo', activeCards: [], pickUp: false };
+      gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceUp: playerOneFaceUp.flat().sort(compare) }, turn: 'playerTwo', activeCards: [], pickUp: false };
     } else {
       gameData.activeCards.push(card);
       let myCards = gameData.activeCards.flat();
@@ -236,7 +269,7 @@ io.on('connection', (socket) => {
           const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerOneFaceUp);
           gameData = {
             ...gameData,
-            playerOne: { ...playerOne, playerOneFaceUp: newCards.flat() },
+            playerOne: { ...playerOne, playerOneFaceUp: newCards.flat().sort(compare) },
             turn: 'playerOne',
             activeCards: [],
             discardedCards: newDiscardedCards,
@@ -245,14 +278,14 @@ io.on('connection', (socket) => {
         } else {
           const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerOneFaceUp);
 
-          gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceUp: newCards.flat() }, turn: 'playerTwo', activeCards: newActiveCards, pickUp: false };
+          gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceUp: newCards.flat().sort(compare) }, turn: 'playerTwo', activeCards: newActiveCards.flat(), pickUp: false };
         }
       } else {
         const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerOneFaceUp);
 
         gameData = {
           ...gameData,
-          playerOne: { ...playerOne, playerOneFaceUp: newCards.flat() },
+          playerOne: { ...playerOne, playerOneFaceUp: newCards.flat().sort(compare) },
           turn: 'playerTwo',
           activeCards: newActiveCards.flat(),
           pickUp: false,
@@ -260,15 +293,15 @@ io.on('connection', (socket) => {
       }
     }
 
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData });
   });
   /* <---------------------------------------- PLAYER ONE FACEDOWN MOVE -------------------------------------------> */
 
-  socket.on('playerOneFaceDownMove', ({ card, playerOneFaceDown, playerOne, gameData, currentActiveCard }) => {
+  socket.on('playerOneFaceDownMove', ({ card, playerOneFaceDown, playerOne, gameData }) => {
     let newCards = [];
     if (gameData.pickUp) {
       playerOneFaceDown.push(gameData.activeCards);
-      gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceDown: playerOneFaceDown.flat() }, turn: 'playerTwo', activeCards: [], pickUp: false };
+      gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceDown: playerOneFaceDown.flat().sort(compare) }, turn: 'playerTwo', activeCards: [], pickUp: false };
     } else {
       gameData.activeCards.push(card);
       let myCards = gameData.activeCards.flat();
@@ -279,7 +312,7 @@ io.on('connection', (socket) => {
           const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerOneFaceDown);
           gameData = {
             ...gameData,
-            playerOne: { ...playerOne, playerOneFaceDown: newCards.flat() },
+            playerOne: { ...playerOne, playerOneFaceDown: newCards.flat().sort(compare) },
             turn: 'playerOne',
             activeCards: [],
             discardedCards: newDiscardedCards,
@@ -288,44 +321,44 @@ io.on('connection', (socket) => {
         } else {
           const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerOneFaceDown);
 
-          gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceDown: newCards.flat() }, turn: 'playerTwo', activeCards: newActiveCards, pickUp: false };
+          gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceDown: newCards.flat().sort(compare) }, turn: 'playerTwo', activeCards: newActiveCards.flat(), pickUp: false };
         }
       } else {
         const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerOneFaceDown);
 
         gameData = {
           ...gameData,
-          playerOne: { ...playerOne, playerOneFaceDown: newCards.flat() },
+          playerOne: { ...playerOne, playerOneFaceDown: newCards.flat().sort(compare) },
           turn: 'playerTwo',
           activeCards: newActiveCards.flat(),
           pickUp: false,
         };
       }
     }
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER ONE MOVE WITH TEN -------------------------------------------> */
 
-  socket.on('playerOneMoveWith10', ({ card, playerOneCards, playerOne, gameData, currentActiveCard }) => {
+  socket.on('playerOneMoveWith10', ({ card, playerOneCards, playerOne, gameData }) => {
     let newCards = [];
     const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerOneCards);
 
     gameData = {
       ...gameData,
-      playerOne: { ...playerOne, playerOneCards: newCards.flat() },
+      playerOne: { ...playerOne, playerOneCards: newCards.flat().sort(compare) },
       turn: 'playerOne',
       activeCards: [],
       discardedCards: newDiscardedCards,
       pickUp: false,
     };
 
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER ONE FACEUP MOVE WITH TEN -------------------------------------------> */
 
-  socket.on('playerOneFaceUpMoveWith10', ({ card, playerOneFaceUp, playerOne, gameData, currentActiveCard }) => {
+  socket.on('playerOneFaceUpMoveWith10', ({ card, playerOneFaceUp, playerOne, gameData }) => {
     let newCards = [];
     const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerOneFaceUp);
 
@@ -333,19 +366,19 @@ io.on('connection', (socket) => {
 
     gameData = {
       ...gameData,
-      playerOne: { ...playerOne, playerOneFaceUp: newCards.flat() },
+      playerOne: { ...playerOne, playerOneFaceUp: newCards.flat().sort(compare) },
       turn: 'playerOne',
       activeCards: [],
       discardedCards: newDiscardedCards,
       pickUp: false,
     };
 
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER ONE FACEDOWN MOVE WITH TEN -------------------------------------------> */
 
-  socket.on('playerOneFaceDownMoveWith10', ({ card, playerOneFaceDown, playerOne, gameData, currentActiveCard }) => {
+  socket.on('playerOneFaceDownMoveWith10', ({ card, playerOneFaceDown, playerOne, gameData }) => {
     let newCards = [];
     const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerOneFaceDown);
 
@@ -353,23 +386,23 @@ io.on('connection', (socket) => {
 
     gameData = {
       ...gameData,
-      playerOne: { ...playerOne, playerOneFaceDown: newCards.flat() },
+      playerOne: { ...playerOne, playerOneFaceDown: newCards.flat().sort(compare) },
       turn: 'playerOne',
       activeCards: [],
       discardedCards: newDiscardedCards,
       pickUp: false,
     };
 
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER TWO MOVE -------------------------------------------> */
 
-  socket.on('playerTwoMove', ({ card, playerTwoCards, playerTwo, gameData, currentActiveCard }) => {
+  socket.on('playerTwoMove', ({ card, playerTwoCards, playerTwo, gameData }) => {
     let newCards = [];
     if (gameData.pickUp) {
       playerTwoCards.push(gameData.activeCards);
-      gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoCards: playerTwoCards.flat() }, turn: 'playerOne', activeCards: [], pickUp: false };
+      gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoCards: playerTwoCards.flat().sort(compare) }, turn: 'playerOne', activeCards: [], pickUp: false };
     } else {
       gameData.activeCards.push(card);
       let myCards = gameData.activeCards.flat();
@@ -379,7 +412,7 @@ io.on('connection', (socket) => {
           const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerTwoCards);
           gameData = {
             ...gameData,
-            playerTwo: { ...playerTwo, playerTwoCards: newCards.flat() },
+            playerTwo: { ...playerTwo, playerTwoCards: newCards.flat().sort(compare) },
             turn: 'playerTwo',
             activeCards: [],
             discardedCards: newDiscardedCards,
@@ -388,24 +421,24 @@ io.on('connection', (socket) => {
         } else {
           const newActiveCards = playerMove(card, gameData, playerTwoCards, newCards);
 
-          gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoCards: newCards.flat() }, turn: 'playerOne', activeCards: newActiveCards, pickUp: false };
+          gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoCards: newCards.flat().sort(compare) }, turn: 'playerOne', activeCards: newActiveCards.flat(), pickUp: false };
         }
       } else {
         const newActiveCards = playerMove(card, gameData, playerTwoCards, newCards);
 
-        gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoCards: newCards.flat() }, turn: 'playerOne', activeCards: newActiveCards, pickUp: false };
+        gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoCards: newCards.flat().sort(compare) }, turn: 'playerOne', activeCards: newActiveCards.flat(), pickUp: false };
       }
     }
-    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER Two FACEUP MOVE -------------------------------------------> */
 
-  socket.on('playerTwoFaceUpMove', ({ card, playerTwoFaceUp, playerTwo, gameData, currentActiveCard }) => {
+  socket.on('playerTwoFaceUpMove', ({ card, playerTwoFaceUp, playerTwo, gameData }) => {
     let newCards = [];
     if (gameData.pickUp) {
       playerTwoFaceUp.push(gameData.activeCards);
-      gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceUp: playerTwoFaceUp.flat() }, turn: 'playerOne', activeCards: [], pickUp: false };
+      gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceUp: playerTwoFaceUp.flat().sort(compare) }, turn: 'playerOne', activeCards: [], pickUp: false };
     } else {
       gameData.activeCards.push(card);
       let myCards = gameData.activeCards.flat();
@@ -415,7 +448,7 @@ io.on('connection', (socket) => {
           const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerTwoFaceUp);
           gameData = {
             ...gameData,
-            playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat() },
+            playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat().sort(compare) },
             turn: 'playerTwo',
             activeCards: [],
             discardedCards: newDiscardedCards,
@@ -424,29 +457,30 @@ io.on('connection', (socket) => {
         } else {
           const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerTwoFaceUp);
 
-          gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat() }, turn: 'playerOne', activeCards: newActiveCards, pickUp: false };
+          gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat().sort(compare) }, turn: 'playerOne', activeCards: newActiveCards.flat(), pickUp: false };
         }
       } else {
         const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerTwoFaceUp);
 
         gameData = {
           ...gameData,
-          playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat() },
+          playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat().sort(compare) },
           turn: 'playerOne',
           activeCards: newActiveCards.flat(),
           pickUp: false,
         };
       }
     }
-    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData });
   });
   /* <---------------------------------------- PLAYER Two FACEDOWN MOVE -------------------------------------------> */
 
-  socket.on('playerTwoFaceDownMove', ({ card, playerTwoFaceDown, playerTwo, gameData, currentActiveCard }) => {
+  socket.on('playerTwoFaceDownMove', ({ card, playerTwoFaceDown, playerTwo, gameData }) => {
     let newCards = [];
+
     if (gameData.pickUp) {
       playerTwoFaceDown.push(gameData.activeCards);
-      gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceDown: playerTwoFaceDown.flat() }, turn: 'playerOne', activeCards: [], pickUp: false };
+      gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceDown: playerTwoFaceDown.flat().sort(compare) }, turn: 'playerOne', activeCards: [], pickUp: false };
     } else {
       gameData.activeCards.push(card);
       let myCards = gameData.activeCards.flat();
@@ -456,7 +490,7 @@ io.on('connection', (socket) => {
           const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerTwoFaceDown);
           gameData = {
             ...gameData,
-            playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat() },
+            playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat().sort(compare) },
             turn: 'playerTwo',
             activeCards: [],
             discardedCards: newDiscardedCards,
@@ -465,44 +499,44 @@ io.on('connection', (socket) => {
         } else {
           const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerTwoFaceDown);
 
-          gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat() }, turn: 'playerOne', activeCards: newActiveCards, pickUp: false };
+          gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat().sort(compare) }, turn: 'playerOne', activeCards: newActiveCards.flat(), pickUp: false };
         }
       } else {
         const newActiveCards = playerMoveFaceCards(gameData, newCards, card, playerTwoFaceDown);
 
         gameData = {
           ...gameData,
-          playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat() },
+          playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat().sort(compare) },
           turn: 'playerOne',
           activeCards: newActiveCards.flat(),
           pickUp: false,
         };
       }
     }
-    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerOne.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER Two MOVE WITH TEN -------------------------------------------> */
 
-  socket.on('playerTwoMoveWith10', ({ card, playerTwoCards, playerTwo, gameData, currentActiveCard }) => {
+  socket.on('playerTwoMoveWith10', ({ card, playerTwoCards, playerTwo, gameData }) => {
     let newCards = [];
     const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerTwoCards);
 
     gameData = {
       ...gameData,
-      playerTwo: { ...playerTwo, playerTwoCards: newCards.flat() },
+      playerTwo: { ...playerTwo, playerTwoCards: newCards.flat().sort(compare) },
       turn: 'playerTwo',
       activeCards: [],
       discardedCards: newDiscardedCards,
       pickUp: false,
     };
 
-    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER TWO FACEUP MOVE WITH TEN -------------------------------------------> */
 
-  socket.on('playerTwoFaceUpMoveWith10', ({ card, playerTwoFaceUp, playerTwo, gameData, currentActiveCard }) => {
+  socket.on('playerTwoFaceUpMoveWith10', ({ card, playerTwoFaceUp, playerTwo, gameData }) => {
     let newCards = [];
     const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerTwoFaceUp);
 
@@ -510,19 +544,19 @@ io.on('connection', (socket) => {
 
     gameData = {
       ...gameData,
-      playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat() },
+      playerTwo: { ...playerTwo, playerTwoFaceUp: newCards.flat().sort(compare) },
       turn: 'playerTwo',
       activeCards: [],
       discardedCards: newDiscardedCards,
       pickUp: false,
     };
 
-    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER Two FACEDOWN MOVE WITH TEN -------------------------------------------> */
 
-  socket.on('playerTwoFaceDownMoveWith10', ({ card, playerTwoFaceDown, playerTwo, gameData, currentActiveCard }) => {
+  socket.on('playerTwoFaceDownMoveWith10', ({ card, playerTwoFaceDown, playerTwo, gameData }) => {
     let newCards = [];
     const newDiscardedCards = playerMoveWith10(gameData, newCards, card, playerTwoFaceDown);
 
@@ -530,44 +564,42 @@ io.on('connection', (socket) => {
 
     gameData = {
       ...gameData,
-      playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat() },
+      playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat().sort(compare) },
       turn: 'playerTwo',
       activeCards: [],
       discardedCards: newDiscardedCards,
       pickUp: false,
     };
 
-    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData, currentActiveCard });
+    io.to(gameData.playerTwo.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, it's your turn`, gameData });
   });
 
   /* <---------------------------------------- PLAYER ONE WINS -------------------------------------------> */
 
-  socket.on('playerOneWins', ({ card, playerOne, gameData }) => {
+  socket.on('playerOneWins', ({ playerOne, gameData }) => {
     console.log('player one winner');
-    let newCards = [];
-    gameData.activeCards.push(card);
-    let newActiveCards = gameData.activeCards.flat().reverse();
 
-    gameData = { ...gameData, playerOne: { ...playerOne, playerOneFaceDown: newCards.flat() }, turn: 'playerOne', activeCards: newActiveCards, pickUp: false };
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerOne.name}, wins`, gameData, currentActiveCard: [] });
+    gameData = { ...gameData, playerOne: { ...playerOne, room: gameData.playerOne.room, name: gameData.playerOne.name, playerOneFaceDown: [] }, turn: 'playerOne', activeCards: [], pickUp: false };
+
+    io.to(gameData.playerOne.room).emit('playerOneWins', gameData);
   });
 
   /* <---------------------------------------- PLAYER TWO WINS -------------------------------------------> */
 
-  socket.on('playerTwoWins', ({ card, playerTwo, gameData }) => {
+  socket.on('playerTwoWins', ({ playerTwo, gameData }) => {
     console.log('player two winner');
-    let newCards = [];
-    gameData.activeCards.push(card);
-    let newActiveCards = gameData.activeCards.flat().reverse();
 
-    gameData = { ...gameData, playerTwo: { ...playerTwo, playerTwoFaceDown: newCards.flat() }, turn: 'playerTwo', activeCards: newActiveCards, pickUp: false };
-    io.to(gameData.playerOne.room).emit('nextTurn', { message: `${gameData.playerTwo.name}, wins`, gameData, currentActiveCard: [] });
+    gameData = { ...gameData, playerTwo: { ...playerTwo, room: gameData.playerTwo.room, name: gameData.playerTwo.name, playerTwoFaceDown: [] }, turn: 'playerTwo', activeCards: [], pickUp: false };
+
+    io.to(gameData.playerOne.room).emit('playerTwoWins', gameData);
   });
 
   /* <---------------------------------------- DISCONNECT -------------------------------------------------> */
 
   socket.on('disconnect', () => {
+    delete io.sockets.adapter.rooms[socket.id];
     socket.disconnect();
+    console.log(socket.rooms.size);
     console.log(`Socket ${socket.id} disconnected.`);
   });
 });
