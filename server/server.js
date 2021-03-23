@@ -9,7 +9,7 @@ const io = socketIo(server, {
   reconnection: false,
   autoConnect: false,
   cors: {
-    origin: 'http://localhost:3000',
+    origin: 'https://karma-card-game.herokuapp.com',
     methods: ['GET', 'POST'],
   },
 });
