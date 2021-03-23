@@ -7,9 +7,11 @@ const Board = ({ gameData, name }) => {
 
   return (
     <>
-      <h3>Room: {playerOne.room.toUpperCase()}</h3>
-      <h4>{name === playerOne.name ? `P1: ${gameData.playerOne.name} vs ${gameData.playerTwo.name} :P2` : `P2: ${gameData.playerTwo.name} vs ${gameData.playerOne.name} :P1`}</h4>
-      <p>{`Top of the Pile (${gameData.pile.length} left)`}</p>
+      <h4>
+        Room: {playerOne.room.toUpperCase()} :{name === playerOne.name ? ` ${gameData.playerOne.name} vs ${gameData.playerTwo.name} ` : ` ${gameData.playerTwo.name} vs ${gameData.playerOne.name} `}
+      </h4>
+      <h6 style={{ margin: '1.2rem 0.5rem 0.5rem 0.5rem' }}>{`Top of the Pile (${gameData.pile.length} left)`}</h6>
+
       {activeCards.length > 0 && (
         <div style={{ marginBottom: '1rem' }}>
           <span style={{ display: 'inlineBlock', margin: '0.1rem' }}>
