@@ -182,7 +182,7 @@ function HomePage() {
           <div>
             {' '}
             <h1>{!winner ? (title ? 'Karma' : 'Shithead') : winner}</h1>
-            {!winner ? <button onClick={toggleTitle}>{title ? "I'm not easily offended!" : 'Why so rude?'}</button> : <button onClick={newGameNow}>{'new Game?'}</button>}
+            {!winner ? <button onClick={toggleTitle}>{title ? "I'm not easily offended!" : 'Why so rude?'}</button> : <button onClick={newGameNow}>{'New Game?'}</button>}
             {newGame && <button onClick={reset}>Click for new game</button>}
             {!gameInProgress && <h3 data-testid='player-name'>Welcome {name}</h3>}
             {!connection && !error && (
