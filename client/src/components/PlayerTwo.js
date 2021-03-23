@@ -331,22 +331,23 @@ const PlayerTwo = ({ gameData }) => {
       </div>
       <div style={{ border: '1px solid white', padding: '0.7rem', marginTop: '1rem' }}>
         <h6 style={{ margin: '0.2rem 0.5rem 0.5rem 0.5rem' }}>{gameData.playerOne.name}'s Face Up Cards</h6>
-        {gameData.playerOne.playerOneFaceUp.map((card, i) => (
-          <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
-            <input
-              style={{
-                padding: '1.8rem 1.2rem',
-                fontSize: '1rem',
-                color: 'white',
-                backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
-              }}
-              type='button'
-              value={`${card.value}`}
-              id='player-two-two'
-              disabled
-            />
-          </span>
-        ))}
+        {gameData.pile > 0 &&
+          gameData.playerOne.playerOneFaceUp.map((card, i) => (
+            <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
+              <input
+                style={{
+                  padding: '1.8rem 1.2rem',
+                  fontSize: '1rem',
+                  color: 'white',
+                  backgroundColor: ` ${card.value.endsWith('♥') || card.value.endsWith('♦') ? 'maroon' : 'black'}`,
+                }}
+                type='button'
+                value={`${card.value}`}
+                id='player-two-two'
+                disabled
+              />
+            </span>
+          ))}
       </div>
     </div>
   );
