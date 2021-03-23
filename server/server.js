@@ -657,12 +657,12 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV === 'production') {
   let root = path.join(__dirname, '..', 'client', 'build/');
   app.use(express.static(root));
-  app.get('*', (req, res) => res.sendFile('index.html', { root }));
+  app.get('/', (req, res, next) => res.sendFile(__dirname, '../client/public/index.html'));
 } else {
   app.get('/', (req, res) => {
     res.json('API is running...');

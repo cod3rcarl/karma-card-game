@@ -1,5 +1,5 @@
 {
-  "name": "power",
+  "name": "karma-card-game",
   "version": "1.0.0",
   "description": "Card Values",
   "main": "server.js",
