@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const server = require('http').Server(app);
 const socketIo = require('socket.io');
 const dotenv = require('dotenv');
+const path = require('path');
 const io = socketIo(server, {
   reconnection: false,
   autoConnect: false,
