@@ -36,9 +36,6 @@ li {
   margin: 1rem 1rem;
 }
 
-span:hover {
-  border: 2px solid gold;
-}
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
