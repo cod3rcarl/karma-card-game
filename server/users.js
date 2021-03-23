@@ -1,5 +1,3 @@
-const { updateGameData } = require('./gameData');
-
 const users = [];
 let rooms = [];
 let isDuplicate;

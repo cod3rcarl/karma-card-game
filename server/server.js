@@ -4,6 +4,7 @@ const app = express();
 const { v4: uuidv4 } = require('uuid');
 const server = require('http').Server(app);
 const socketIo = require('socket.io');
+const dotenv = require('dotenv');
 const io = socketIo(server, {
   reconnection: false,
   autoConnect: false,
@@ -12,7 +13,7 @@ const io = socketIo(server, {
     methods: ['GET', 'POST'],
   },
 });
-
+dotenv.config();
 const cors = require('cors');
 const { userJoin, userLeave, users, isDuplicate, error } = require('./users');
 
@@ -668,8 +669,6 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-server.listen(PORT, () => {
-  console.log(`Api listening on port ${PORT}!`);
-});
+server.listen(PORT, console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));
 
 module.exports = app;
