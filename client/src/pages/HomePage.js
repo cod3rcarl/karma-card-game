@@ -100,7 +100,7 @@ function HomePage() {
         });
         setLoading('');
       } else {
-        setLoading('waiting for 2nd player');
+        setLoading(`Waiting for 2nd player to join room: ${playerOne.room}`);
       }
     },
     [socket]

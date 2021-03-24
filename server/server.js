@@ -171,7 +171,7 @@ io.on('connection', (socket) => {
   const playerMoveFaceCards = (data, newCards, card, playerCards) => {
     let newActiveCards = data.activeCards.flat();
     const myNewCards = refillPlayerCards(playerCards, card, newCards);
-    console.log(myNewCards);
+
     if (myNewCards.length === 0) {
       return [];
     }
@@ -189,7 +189,7 @@ io.on('connection', (socket) => {
     if (data.pile.length > 0) {
       lowPileLogic(data, newCards, card, playerCards);
     }
-    console.log(myNewCards);
+
     if (myNewCards.length === 0) {
       return [];
     }
@@ -653,7 +653,6 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     delete io.sockets.adapter.rooms[socket.id];
     socket.disconnect();
-    console.log(socket.rooms.size);
     console.log(`Socket ${socket.id} disconnected.`);
   });
 });
