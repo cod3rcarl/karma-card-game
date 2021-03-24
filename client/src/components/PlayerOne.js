@@ -134,6 +134,7 @@ const PlayerOne = ({ gameData }) => {
       emitEvent(card);
     }
   };
+  console.log(gameData.pile);
   return (
     <div>
       <h6 style={{ margin: '0.5rem' }}> Face Up Cards</h6>
@@ -335,7 +336,7 @@ const PlayerOne = ({ gameData }) => {
       </div>
       <div style={{ border: '1px solid white', padding: '0.7rem', margin: '1rem 0' }}>
         <h6 style={{ margin: '0.2rem 0.5rem 0.5rem 0.5rem' }}>{gameData.playerTwo.name}'s Face Up Cards</h6>
-        {gameData.pile > 0 &&
+        {gameData.pile.length > 0 &&
           gameData.playerTwo.playerTwoFaceUp.map((card, i) => (
             <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
               <input

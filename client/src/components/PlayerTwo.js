@@ -331,7 +331,7 @@ const PlayerTwo = ({ gameData }) => {
       </div>
       <div style={{ border: '1px solid white', padding: '0.7rem', marginTop: '1rem' }}>
         <h6 style={{ margin: '0.2rem 0.5rem 0.5rem 0.5rem' }}>{gameData.playerOne.name}'s Face Up Cards</h6>
-        {gameData.pile > 0 &&
+        {gameData.pile.length > 0 &&
           gameData.playerOne.playerOneFaceUp.map((card, i) => (
             <span key={i} style={{ display: 'inlineBlock', margin: '0.1rem' }}>
               <input

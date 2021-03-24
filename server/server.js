@@ -11,6 +11,7 @@ const io = socketIo(server, {
   autoConnect: false,
   cors: {
     origin: 'https://karma-card-game.herokuapp.com',
+    // origin: 'http://localhost:3000',
     methods: ['GET', 'POST'],
   },
 });
@@ -84,19 +85,18 @@ io.on('connection', (socket) => {
       userLeave(room, id);
       userLeave(room, data.playerTwo.id);
 
-      //io.of('/').connected[data.playerTwo.id].leave(room);
+      socket.leave(room);
       socket.disconnect(id);
       socket.disconnect(data.playerTwo.id);
-      socket.leave(room);
     }
     if (data && data.playerTwo.id === id) {
       console.log('playerTwo left');
       userLeave(room, id);
       userLeave(room, data.playerOne.id);
-      //io.of('/').connected[data.playerOne.id].leave(room);
+
+      socket.leave(room);
       socket.disconnect(id);
       socket.disconnect(data.playerOne.id);
-      socket.leave(room);
     }
 
     io.to(room).emit('leaveMessage', { message: `${name} has left, please refresh game` });
